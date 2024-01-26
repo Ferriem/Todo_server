@@ -7,5 +7,3 @@ import (
 var Rdb *redis.Client
 
 type Err string
-
-const userList = "userList"

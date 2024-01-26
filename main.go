@@ -38,8 +38,8 @@ func main() {
 	Group.Any("/delete", func(c *gin.Context) {
 		userController.Delete(c)
 	})
-	Group.Any("/update", func(c *gin.Context) {
-		userController.Update(c)
+	Group.Any("/done", func(c *gin.Context) {
+		userController.Done(c)
 	})
 	router.Run(":8080")
 }

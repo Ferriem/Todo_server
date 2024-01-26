@@ -2,19 +2,16 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/Ferriem/Todo_server/config"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type User struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
 type key_value_pair struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+	Done  bool   `json:"done"`
 }
 
 func NewUser(id string, password string) config.Err {
@@ -65,12 +62,29 @@ func Login(id string, password string) (bool, config.Err) {
 func Add(id string, title string, description string) config.Err {
 	client := config.Rdb
 	ctx := context.Background()
+	task := id + "_" + title + "_" + description
+	value, err := client.Exists(ctx, task).Result()
+	if err != nil {
+		return ErrAdd
+	}
+	if value == 1 {
+		return ErrTitleExists
+	}
+	err = client.HSet(ctx, task, "done", false).Err()
+	if err != nil {
+		return ErrAdd
+	}
 	key_value := key_value_pair{
 		Key:   title,
 		Value: description,
+		Done:  false,
 	}
 	list := id + "_list"
-	err := client.RPush(ctx, list, key_value).Err()
+	serializedData, err := json.Marshal(key_value)
+	if err != nil {
+		return ErrAdd
+	}
+	err = client.RPush(ctx, list, serializedData).Err()
 	if err != nil {
 		return ErrAdd
 	}
@@ -99,28 +113,94 @@ func GetInfo(id string) ([]string, config.Err) {
 	return value, NoError
 }
 
-func Delete(id string) config.Err {
+func Done(id string, title string, description string) config.Err {
 	client := config.Rdb
 	ctx := context.Background()
+	task := id + "_" + title + "_" + description
 	list := id + "_list"
-	err := client.Del(ctx, list).Err()
+	value, err := client.Exists(ctx, task).Result()
 	if err != nil {
-		return ErrDelete
+		return ErrDone
+	}
+	if value == 0 {
+		return ErrNoSuchTask
+	}
+	values, err := client.HGet(ctx, task, "done").Result()
+	if err != nil {
+		return ErrDone
+	}
+	if values == "1" {
+		return ErrAlreadyDone
+	}
+
+	err = client.HSet(ctx, task, "done", true).Err()
+	if err != nil {
+		return ErrDone
+	}
+	key_value := key_value_pair{
+		Key:   title,
+		Value: description,
+		Done:  false,
+	}
+	serializedData, err := json.Marshal(key_value)
+	if err != nil {
+		return ErrDone
+	}
+	err = client.LRem(ctx, list, 0, serializedData).Err()
+	if err != nil {
+		return ErrDone
+	}
+	key_value.Done = true
+	serializedData, err = json.Marshal(key_value)
+	if err != nil {
+		return ErrDone
+	}
+	err = client.RPush(ctx, list, serializedData).Err()
+	if err != nil {
+		return ErrDone
 	}
 	return NoError
 }
 
-func Update(id string, title string, description string) config.Err {
+func Delete(id string, title string, description string) config.Err {
 	client := config.Rdb
 	ctx := context.Background()
+	list := id + "_list"
+	task := id + "_" + title + "_" + description
+	value, err := client.Exists(ctx, task).Result()
+	if err != nil {
+		return ErrDelete
+	}
+	if value == 0 {
+		return ErrNoSuchTask
+	}
+	done, err := client.HGet(ctx, task, "done").Result()
+	if err != nil {
+		return ErrDelete
+	}
 	key_value := key_value_pair{
 		Key:   title,
 		Value: description,
 	}
-	list := id + "_list"
-	err := client.LSet(ctx, list, 0, key_value).Err()
+
+	if done == "0" {
+		key_value.Done = false
+	} else {
+		key_value.Done = true
+	}
+
+	serializedData, err := json.Marshal(key_value)
 	if err != nil {
-		return ErrUpdate
+		return ErrDelete
+	}
+
+	err = client.LRem(ctx, list, 0, serializedData).Err()
+	if err != nil {
+		return ErrDelete
+	}
+	err = client.Del(ctx, task).Err()
+	if err != nil {
+		return ErrDelete
 	}
 	return NoError
 }

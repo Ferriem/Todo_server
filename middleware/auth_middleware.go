@@ -11,7 +11,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get password from header
 		var auth models.Auth
-		if err := c.ShouldBindBodyWith(&auth, binding.JSON); err != nil {
+		if err := c.ShouldBindBodyWith(&auth, binding.JSON); err != nil || auth.ID == "" || auth.Password == "" {
 			c.JSON(500, gin.H{"error": "Invalid json"})
 		}
 

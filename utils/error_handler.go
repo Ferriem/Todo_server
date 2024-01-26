@@ -13,4 +13,8 @@ const (
 	ErrAdd               = config.Err("Error adding todo")
 	ErrDelete            = config.Err("Error deleting todo")
 	ErrUpdate            = config.Err("Error updating todo")
+	ErrDone              = config.Err("Error marking todo as done")
+	ErrTitleExists       = config.Err("Title already exists")
+	ErrNoSuchTask        = config.Err("No such task")
+	ErrAlreadyDone       = config.Err("Task already done")
 )

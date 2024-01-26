@@ -82,12 +82,18 @@ func (uc *UserController) GetInfo(c *gin.Context) {
 
 func (uc *UserController) Add(c *gin.Context) {
 	var todo models.Todo
-	if err := c.ShouldBindBodyWith(&todo, binding.JSON); err != nil {
+	if err := c.ShouldBindBodyWith(&todo, binding.JSON); err != nil || todo.Title == "" {
 		c.JSON(500, gin.H{"error": "Invalid json"})
 		return
 	}
 	err := utils.Add(todo.ID, todo.Title, todo.Description)
 	if err != utils.NoError {
+		if err == utils.ErrTitleExists {
+			c.JSON(500, gin.H{
+				"message": "Title already exists",
+			})
+			return
+		}
 		c.JSON(500, gin.H{
 			"message": "Error Add",
 		})
@@ -100,12 +106,18 @@ func (uc *UserController) Add(c *gin.Context) {
 
 func (uc *UserController) Delete(c *gin.Context) {
 	var todo models.Todo
-	if err := c.ShouldBindBodyWith(&todo, binding.JSON); err != nil {
+	if err := c.ShouldBindBodyWith(&todo, binding.JSON); err != nil || todo.Title == "" {
 		c.JSON(500, gin.H{"error": "Invalid json"})
 		return
 	}
-	err := utils.Delete(todo.ID)
+	err := utils.Delete(todo.ID, todo.Title, todo.Description)
 	if err != utils.NoError {
+		if err == utils.ErrNoSuchTask {
+			c.JSON(500, gin.H{
+				"message": "No such task",
+			})
+			return
+		}
 		c.JSON(500, gin.H{
 			"message": "Error Delete",
 		})
@@ -116,20 +128,32 @@ func (uc *UserController) Delete(c *gin.Context) {
 	})
 }
 
-func (uc *UserController) Update(c *gin.Context) {
+func (uc *UserController) Done(c *gin.Context) {
 	var todo models.Todo
-	if err := c.ShouldBindBodyWith(&todo, binding.JSON); err != nil {
+	if err := c.ShouldBindBodyWith(&todo, binding.JSON); err != nil || todo.ID == "" {
 		c.JSON(500, gin.H{"error": "Invalid json"})
 		return
 	}
-	err := utils.Update(todo.ID, todo.Title, todo.Description)
+	err := utils.Done(todo.ID, todo.Title, todo.Description)
 	if err != utils.NoError {
+		if err == utils.ErrNoSuchTask {
+			c.JSON(500, gin.H{
+				"message": "No such task",
+			})
+			return
+		}
+		if err == utils.ErrAlreadyDone {
+			c.JSON(500, gin.H{
+				"message": "Task already done",
+			})
+			return
+		}
 		c.JSON(500, gin.H{
-			"message": "Error Update",
+			"message": "Error Done",
 		})
 		return
 	}
 	c.JSON(200, gin.H{
-		"message": "Success Update",
+		"message": "Success Done",
 	})
 }
